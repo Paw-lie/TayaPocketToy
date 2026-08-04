@@ -32,6 +32,39 @@ int8_t findAnimationByContains(const char* token) {
   return -1;
 }
 
+uint8_t randomCharacterAnimationMatch(const char* tokenPrefix) {
+  uint8_t selected = 0xFF;
+  uint16_t matches = 0;
+  const uint8_t count = GeneratedSprites::animationCount();
+  for (uint8_t i = 0; i < count; ++i) {
+    const char* name = GeneratedSprites::animationName(i);
+    if (name == nullptr || strstr(name, tokenPrefix) == nullptr) {
+      continue;
+    }
+
+    ++matches;
+    if (random(matches) == 0) {
+      selected = i;
+    }
+  }
+
+  return selected;
+}
+
+uint8_t firstCharacterIdleFallback() {
+  const int8_t exact = findAnimationByContains("character_chiino_chiino_idle");
+  if (exact >= 0) {
+    return static_cast<uint8_t>(exact);
+  }
+
+  const int8_t generic = findAnimationByContains("character_");
+  if (generic >= 0) {
+    return static_cast<uint8_t>(generic);
+  }
+
+  return 0;
+}
+
 }  // namespace
 
 namespace Assets {
@@ -80,6 +113,63 @@ uint8_t splashAnimationId() {
   return 0;
 }
 
+uint8_t eggAnimationId() {
+  const int8_t exact = findAnimationByContains("egg_egg_idle");
+  if (exact >= 0) {
+    return static_cast<uint8_t>(exact);
+  }
+
+  const int8_t legacyLayer = findAnimationByContains("egg_animation_layer");
+  if (legacyLayer >= 0) {
+    return static_cast<uint8_t>(legacyLayer);
+  }
+
+  const int8_t generic = findAnimationByContains("egg");
+  if (generic >= 0) {
+    return static_cast<uint8_t>(generic);
+  }
+
+  return defaultPetAnimationId();
+}
+
+uint8_t hatchAnimationId() {
+  const int8_t exact = findAnimationByContains("hatch_animation_egg_hatch");
+  if (exact >= 0) {
+    return static_cast<uint8_t>(exact);
+  }
+
+  const int8_t legacyLayer = findAnimationByContains("hatch_animation_layer");
+  if (legacyLayer >= 0) {
+    return static_cast<uint8_t>(legacyLayer);
+  }
+
+  const int8_t generic = findAnimationByContains("hatch");
+  if (generic >= 0) {
+    return static_cast<uint8_t>(generic);
+  }
+
+  return eggAnimationId();
+}
+
+uint8_t rebirthAnimationId() {
+  const int8_t exact = findAnimationByContains("rebirth_animation_rebirth");
+  if (exact >= 0) {
+    return static_cast<uint8_t>(exact);
+  }
+
+  const int8_t legacyLayer = findAnimationByContains("rebirth_animation_layer");
+  if (legacyLayer >= 0) {
+    return static_cast<uint8_t>(legacyLayer);
+  }
+
+  const int8_t generic = findAnimationByContains("rebirth");
+  if (generic >= 0) {
+    return static_cast<uint8_t>(generic);
+  }
+
+  return hatchAnimationId();
+}
+
 uint8_t defaultPetAnimationId() {
   const int8_t baseExact = findAnimationByContains("blobb_bases__blobb_base");
   if (baseExact >= 0) {
@@ -97,6 +187,46 @@ uint8_t defaultPetAnimationId() {
   }
 
   return splashAnimationId();
+}
+
+uint8_t characterAnimationId(CharacterForm form) {
+  int8_t resolved = -1;
+  switch (form) {
+    case FORM_TAIYAKI:
+      resolved = findAnimationByContains("character_taiykai_taiyaki_idle");
+      break;
+    case FORM_PAWLIE:
+      resolved = findAnimationByContains("character_pawlie_pawlie_idle");
+      break;
+    case FORM_CHIINO:
+      resolved = findAnimationByContains("character_chiino_chiino_idle");
+      break;
+    case FORM_TOFU:
+      resolved = findAnimationByContains("character_tofu_tofu_idle");
+      break;
+    case FORM_YSHAAR:
+      resolved = findAnimationByContains("character_yshaar_yshaar_idle");
+      break;
+    case FORM_BLOBB:
+    case FORM_NONE:
+    default:
+      break;
+  }
+
+  if (resolved >= 0) {
+    return static_cast<uint8_t>(resolved);
+  }
+
+  return firstCharacterIdleFallback();
+}
+
+uint8_t randomCharacterAnimationId() {
+  const uint8_t candidate = randomCharacterAnimationMatch("character_");
+  if (candidate != 0xFF) {
+    return candidate;
+  }
+
+  return firstCharacterIdleFallback();
 }
 
 const AccessorySprite* getAccessory(AccessoryId accessoryId) {

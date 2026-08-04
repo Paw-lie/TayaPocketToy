@@ -36,7 +36,12 @@ const AnimationDef& animationOrSplash(uint8_t index);
 uint8_t animationCount();
 const char* animationName(uint8_t index);
 uint8_t splashAnimationId();
+uint8_t eggAnimationId();
+uint8_t hatchAnimationId();
+uint8_t rebirthAnimationId();
 uint8_t defaultPetAnimationId();
+uint8_t characterAnimationId(CharacterForm form);
+uint8_t randomCharacterAnimationId();
 const AccessorySprite* getAccessory(AccessoryId accessoryId);
 
 }  // namespace Assets

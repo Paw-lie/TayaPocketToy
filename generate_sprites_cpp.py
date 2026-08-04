@@ -104,6 +104,41 @@ def load_mono_image(path: Path) -> Image.Image:
     return Image.open(path).convert("RGBA")
 
 
+def frame_ink_bbox(img: Image.Image, threshold: int) -> tuple[int, int, int, int] | None:
+    """Return tight bbox around ON pixels, or None if the frame has no ON pixel."""
+    width, height = img.size
+    rgba = img.load()
+
+    min_x = width
+    min_y = height
+    max_x = -1
+    max_y = -1
+
+    for y in range(height):
+        for x in range(width):
+            r, g, b, a = rgba[x, y]
+            if a == 0:
+                continue
+
+            luminance = (r * 299 + g * 587 + b * 114) // 1000
+            if luminance > threshold:
+                continue
+
+            if x < min_x:
+                min_x = x
+            if y < min_y:
+                min_y = y
+            if x > max_x:
+                max_x = x
+            if y > max_y:
+                max_y = y
+
+    if max_x < min_x or max_y < min_y:
+        return None
+
+    return (min_x, min_y, max_x + 1, max_y + 1)
+
+
 def image_to_ssd1306_vertical_lsb(img: Image.Image, threshold: int) -> bytes:
     width, height = img.size
     pages = (height + 7) // 8
@@ -156,6 +191,8 @@ class AnimationDefGen:
     frame_symbols: List[str]
     width: int
     height: int
+    crop_offset_x: int
+    crop_offset_y: int
 
 
 def generate_assets(sprites_root: Path, threshold: int) -> tuple[List[FrameDef], List[AnimationDefGen]]:
@@ -190,22 +227,39 @@ def generate_assets(sprites_root: Path, threshold: int) -> tuple[List[FrameDef],
 
             anim_symbol = sanitize_identifier(anim_name)
             frame_symbols: List[str] = []
-            base_w = None
-            base_h = None
+            loaded_frames: list[tuple[Path, Image.Image]] = []
+            union_left = None
+            union_top = None
+            union_right = None
+            union_bottom = None
 
-            for idx, img_path in enumerate(group_frames):
+            for img_path in group_frames:
                 img = load_mono_image(img_path)
-                w, h = img.size
+                loaded_frames.append((img_path, img))
 
-                if base_w is None:
-                    base_w, base_h = w, h
-                elif w != base_w or h != base_h:
-                    raise ValueError(
-                        f"Animation '{anim_name}' has mixed frame sizes: {img_path.name} is {w}x{h}, expected {base_w}x{base_h}"
-                    )
+                bbox = frame_ink_bbox(img, threshold)
+                if bbox is None:
+                    continue
+
+                left, top, right, bottom = bbox
+                union_left = left if union_left is None else min(union_left, left)
+                union_top = top if union_top is None else min(union_top, top)
+                union_right = right if union_right is None else max(union_right, right)
+                union_bottom = bottom if union_bottom is None else max(union_bottom, bottom)
+
+            if union_left is None:
+                print(f"Skipping animation with no non-empty frames: {anim_name}")
+                continue
+
+            crop_box = (union_left, union_top, union_right, union_bottom)
+            base_w = crop_box[2] - crop_box[0]
+            base_h = crop_box[3] - crop_box[1]
+
+            for idx, (img_path, img) in enumerate(loaded_frames):
+                cropped = img.crop(crop_box)
 
                 symbol = f"k{anim_symbol}_frame_{idx + 1}"
-                data = image_to_ssd1306_vertical_lsb(img, threshold)
+                data = image_to_ssd1306_vertical_lsb(cropped, threshold)
 
                 if is_empty_frame(data):
                     skipped_empty_frames += 1
@@ -213,7 +267,7 @@ def generate_assets(sprites_root: Path, threshold: int) -> tuple[List[FrameDef],
                     continue
 
                 frame_symbols.append(symbol)
-                frames.append(FrameDef(symbol=symbol, width=w, height=h, data=data))
+                frames.append(FrameDef(symbol=symbol, width=base_w, height=base_h, data=data))
 
             if not frame_symbols:
                 print(f"Skipping animation with no non-empty frames: {anim_name}")
@@ -224,8 +278,10 @@ def generate_assets(sprites_root: Path, threshold: int) -> tuple[List[FrameDef],
                     name=anim_name,
                     symbol=f"k{anim_symbol}",
                     frame_symbols=frame_symbols,
-                    width=base_w or 0,
-                    height=base_h or 0,
+                    width=base_w,
+                    height=base_h,
+                    crop_offset_x=union_left,
+                    crop_offset_y=union_top,
                 )
             )
 
@@ -275,7 +331,9 @@ def write_cpp(out_cpp: Path, header_name: str, frames: Iterable[FrameDef], anima
         frame_table = f"{anim.symbol}_frames"
         lines.append(f"const SpriteFrame {frame_table}[] = {{")
         for fs in anim.frame_symbols:
-            lines.append(f"  {{{fs}, {anim.width}, {anim.height}, 0, 0, true}},")
+            lines.append(
+                f"  {{{fs}, {anim.width}, {anim.height}, {anim.crop_offset_x}, {anim.crop_offset_y}, true}},"
+            )
         lines.append("};")
         lines.append(f"const AnimationDef {anim.symbol} = {{{frame_table}, {len(anim.frame_symbols)}}};")
         lines.append("")

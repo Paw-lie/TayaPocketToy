@@ -91,9 +91,9 @@ Where:
 
 ## 8) Evolution and death
 
-- [ ] Add evolution timer window and factor-based resolver
-- [ ] Add death conditions and revive/reset flow
-- [ ] Keep implementation pluggable for future characters
+- [x] Add evolution timer window and factor-based resolver
+- [x] Add death conditions and revive/reset flow
+- [x] Keep implementation pluggable for future characters
 
 Where:
 - Timers and decision policy: App.cpp
