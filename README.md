@@ -1,3 +1,5 @@
+[Caution this is a project in great parts vibe-coded, therefore the quality is iffy at best]
+
 ## Pocket Pet for XIAO ESP32-S3
 
 A pocket-pet project based on the Seeed Studio XIAO ESP32-S3 microcontroller.
